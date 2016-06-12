@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Yes</title>
+</head>
+<body>
+
+	<style>
+		
+		* {
+			box-sizing: border-box;
+		}
+
+		html, body {
+			margin: 0;
+			width: 100%;
+			height: 100%;
+		}
+
+	</style>
+	
+	<canvas id="canvas">
+		
+	</canvas>
+	<script>
+
+		/* 
+			AUDIO 
+		*/
+		//Create context
+		var ctx = new AudioContext();
+		var audio = new Audio();
+		var srcUrl = "knot.mp3";
+		audio.src = srcUrl;
+		audio.crossOrigin = "anonymous";
+
+		//Create nodes
+		var source = ctx.createMediaElementSource(audio);
+		var gainNode = ctx.createGain();
+		var analyser = ctx.createAnalyser(source);
+
+		//'Anal'yser node settings
+		analyser.fftSize = 256; //set to small number because I'm cheap af
+		var bufferLength = new Uint8Array(analyser.frequencyBinCount);
+
+		//Connect nodes
+		source.connect(analyser);
+		analyser.connect(gainNode);
+		gainNode.connect(ctx.destination);
+
+
+		/* 
+			CANVAS
+		*/
+		//Create canvas and context
+		var canvas = document.getElementById("canvas");
+		var canvasCtx = canvas.getContext("2d");
+
+		//Canvas global settings
+		canvas.width = window.innerWidth;
+		canvas.height = window.innerHeight;
+		//var bgFill = "rgb(" + ( Math.floor(Math.random() * 254)) + ", 229, 255)";
+		var bgFill = "rgb(0, 0, 0)";
+
+		//Initial draw
+		canvasCtx.fillStyle = bgFill;
+		canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+
+		/*
+			RAIN
+		*/
+		function Rain(xPos) {
+
+			//Settings
+			this.x = xPos || Math.floor(Math.random() * canvas.width);
+			this.y = 0;
+			this.acc = 1.5;
+			this.vel = 0;
+			this.width = 8;
+			this.height = 13;
+
+		};
+
+		Rain.prototype.update = function() {
+
+			//Gravity
+			this.vel += this.acc;
+			this.y += this.vel;
+
+			//Remove this rain object from entities list if outside of canvas view (stop lag from updating and drawing too many objects)
+			if (this.y > canvas.height){
+				entities.splice(this, 1);
+			}
+		};
+
+		Rain.prototype.draw = function() {
+
+			//Set colour and position based on update
+			canvasCtx.fillStyle = "rgb(" + ( Math.floor(Math.random() * 254)) + ", " + ( Math.floor(Math.random() * 254)) + ", 255";
+			canvasCtx.fillRect(this.x, this.y, this.width, this.height);
+		};
+
+		var entities = [];
+
+
+		/*
+			FUNCTIONS
+		*/
+		//Play audio source
+		source.mediaElement.play();
+
+		//Draw rain
+		function frame(){
+			
+			//Get ze data
+			analyser.getByteFrequencyData(bufferLength);
+
+			//Set rain spawn width based on current window width
+			var barWidth = Math.ceil(canvas.width / bufferLength.length);
+			var xPos = 0;
+			var limiter = 9;
+
+			//Blit screen
+			canvasCtx.fillStyle = "rgb(" + ( Math.floor(Math.random() * 10)) + ", " + ( Math.floor(Math.random() * 10)) + ", " + ( Math.floor(Math.random() * 10)) + ")";
+			canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+			//Set rain colour for frame
+			canvasCtx.fillStyle = "rgb(" + ( Math.floor(Math.random() * 254)) + ", 0, " + ( Math.floor(Math.random() * 254));
+
+			//Draw rain dependent on whether there is sound at frequency in relation to canvas width
+			for (var i = 0; i < bufferLength.length; i++) {
+				xPos = i * barWidth;
+				var rand = Math.floor(Math.random() * limiter);
+				if (bufferLength[i] > 120 && rand == 1) {
+					entities.push( new Rain(xPos) );
+				}
+			}
+
+			//Animate rain entities
+			if (entities.length > 0) {	//ensure there are entities to draw or it will try to draw 'undefined' and error
+				for (var i = 0; i < entities.length; i++) {
+					entities[i].update();
+					entities[i].draw();
+				}
+			}
+			
+
+			//Call frame again, creating draw loop
+			requestAnimationFrame(frame);
+
+		};
+
+		//Initial frame call
+		requestAnimationFrame(frame);
+
+
+		/*
+			EVENTS
+		*/
+		//Enable Pausing
+		window.addEventListener("keypress", function() {
+
+			if (source.mediaElement.paused == false) {
+				source.mediaElement.pause();
+			} else {
+				source.mediaElement.play();
+			}
+			
+		});
+
+		//Resize visuals if window size is updated
+		window.addEventListener("resize", function() {
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+		});
+
+	</script>
+
+</body>
+</html>
